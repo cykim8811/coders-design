@@ -1,0 +1,2 @@
+# Mail patches contain significant whitespace in blank context lines.
+integration/*.patch -whitespace

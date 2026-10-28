@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "name": "Coders Design",
+  "services": [
+    "postgres",
+    "redis",
+    "objects"
+  ],
+  "permissions": [
+    "frontend"
+  ],
+  "secrets": [
+    "DESIGN_AUTH_SECRET"
+  ],
+  "browser": {
+    "workers": true,
+    "wasm": true,
+    "blob_images": true,
+    "frames": true
+  },
+  "limits": {
+    "cpu_millis": 2000,
+    "memory_mib": 2048,
+    "request_bytes": 16777216,
+    "response_bytes": 16777216,
+    "timeout_seconds": 120,
+    "concurrency": 32,
+    "temporary_mib": 512,
+    "image_bytes": 2147483648,
+    "startup_seconds": 180,
+    "shutdown_seconds": 15,
+    "readiness_path": "/health"
+  },
+  "routes": [
+    {
+      "prefix": "/",
+      "endpoint": "server"
+    }
+  ],
+  "endpoints": {
+    "server": {
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD",
+        "OPTIONS",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE"
+      ]
+    }
+  }
+}

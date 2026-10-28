@@ -1,0 +1,80 @@
+From 0efeb43416e64c590edae1b25dccc6f9b74cb8ce Mon Sep 17 00:00:00 2001
+From: Codex <codex@users.noreply.github.com>
+Date: Wed, 28 Oct 2026 23:08:50 +0000
+Subject: [PATCH] Allow declared same-origin renderer frames
+
+---
+ docs/compatibility.md  |  2 +-
+ src/coders/web_apps.py |  6 ++++--
+ tests/test_web_apps.py | 14 ++++++++++++++
+ 3 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/docs/compatibility.md b/docs/compatibility.md
+index 9e44668..061c899 100644
+--- a/docs/compatibility.md
++++ b/docs/compatibility.md
+@@ -445,7 +445,7 @@ HTTP 이미지 앱은 경로 접두사를 선언하여 기존 서버의 라우
+ 
+ `prefix`는 `/`로 시작하고 끝나는 경로입니다. 더 긴 접두사를 우선 적용하며, 참조하는 HTTP 엔드포인트의 `path`는 `/`입니다. 원래 하위 경로·쿼리·허용 메서드·바이너리 본문과 응답 MIME·다운로드 헤더를 전달합니다. WebSocket도 같은 경로 규칙과 인증·리소스·예산 검사를 사용합니다. CLI·Agent는 `/github/{owner}/{repo}/{commit}/{endpoint}/{path}`에서 같은 선언 경로를 호출합니다. `/_coders/*`는 Core가 처리합니다.
+ 
+-`browser.workers`, `wasm`, `blob_images`는 앱 출처 안의 브라우저 기능입니다. `browser.origins`에는 정확한 HTTPS 출처를 선언합니다. 외부 연결·이미지·폰트 출처는 리소스의 `network` 승인에 따라 CSP에 반영됩니다. Web Worker는 앱 출처 또는 `blob:`에서 실행하고, Service Worker 등록은 차단합니다. 앱 화면과 Core 계좌·승인 화면은 각자의 출처를 사용합니다.
++`browser.workers`, `wasm`, `blob_images`는 앱 출처 안의 브라우저 기능입니다. `browser.frames: true`는 앱과 같은 출처의 내부 iframe을 허용합니다. 앱 문서의 `frame-src`와 `frame-ancestors`에 `'self'`를 함께 추가하며 외부 출처의 iframe은 허용하지 않습니다. `browser.origins`에는 정확한 HTTPS 출처를 선언합니다. 외부 연결·이미지·폰트 출처는 리소스의 `network` 승인에 따라 CSP에 반영됩니다. Web Worker는 앱 출처 또는 `blob:`에서 실행하고, Service Worker 등록은 차단합니다. 앱 화면과 Core 계좌·승인 화면은 각자의 출처를 사용합니다.
+ 
+ `limits`는 앱이 요청하는 실행 조건입니다. 운영자 상한을 초과하면 준비 단계에서 거부합니다. CPU·메모리는 실제 컨테이너 할당과 실행 요율에 함께 반영합니다. HTTP 요청·응답 상한은 각각 적용하며, `/tmp`는 메모리에 포함되는 임시 공간입니다. 기동 제한 시간 안에 TCP 포트 또는 `readiness_path`가 준비되어야 합니다. 계속 실행·자동 중지는 기존 리소스 정책을 사용합니다.
+ 
+diff --git a/src/coders/web_apps.py b/src/coders/web_apps.py
+index 7770370..4a3cb65 100644
+--- a/src/coders/web_apps.py
++++ b/src/coders/web_apps.py
+@@ -17,6 +17,7 @@ class BrowserFeatures(Specification):
+     workers: bool = False
+     wasm: bool = False
+     blob_images: bool = False
++    frames: bool = False
+     origins: list[str] = Field(default_factory=list, max_length=16)
+ 
+     @field_validator("origins")
+@@ -148,12 +149,13 @@ def content_security_policy(browser, project, connection, slug, ancestors):
+     script = "'self' 'unsafe-inline'" + (" 'wasm-unsafe-eval'" if features.wasm else "")
+     images = "'self' data:" + (" blob:" if features.blob_images else "")
+     workers = "'self' blob:" if features.workers else "'none'"
++    frames = "'self' " if features.frames else ""
+     return (
+         f"default-src 'self'; script-src {script}; style-src 'self' 'unsafe-inline'; "
+         f"img-src {images} {origins} {managed}; font-src 'self' data: {origins}; "
+         f"connect-src 'self' {origins} {managed}; "
+-        f"frame-src {browser.settings.browser_url}/chip/{slug}; "
+-        f"frame-ancestors {browser.settings.browser_url} {ancestors}; "
++        f"frame-src {frames}{browser.settings.browser_url}/chip/{slug}; "
++        f"frame-ancestors {frames}{browser.settings.browser_url} {ancestors}; "
+         f"base-uri 'none'; form-action 'self'; object-src 'none'; "
+         f"worker-src {workers}; manifest-src 'none'"
+     )
+diff --git a/tests/test_web_apps.py b/tests/test_web_apps.py
+index f24e47b..0b58a63 100644
+--- a/tests/test_web_apps.py
++++ b/tests/test_web_apps.py
+@@ -73,6 +73,20 @@ def test_capacity_is_platform_bounded_and_changes_compute_tariff(browser_app):
+         configured(settings, {"limits": {"memory_mib": settings.app_max_memory_mib + 1}})
+ 
+ 
++def test_same_origin_renderer_frames_require_app_declaration(browser_app):
++    browser = browser_app.state.browser
++    for enabled in (False, True):
++        project = {"manifest": {"browser": {"frames": enabled}}}
++        policy = content_security_policy(
++            browser, project, {"permissions": []}, "app", "https://design.coders.kr"
++        )
++        directives = dict(part.strip().split(" ", 1) for part in policy.split(";") if part.strip())
++        assert ("'self'" in directives["frame-src"].split()) == enabled
++        assert ("'self'" in directives["frame-ancestors"].split()) == enabled
++        assert "https://design.coders.kr" in directives["frame-ancestors"]
++        assert browser.settings.browser_url + "/chip/app" in directives["frame-src"]
++
++
+ def test_dynamic_paths_use_authenticated_gateway_and_preserve_http(
+     browser_app, browser_client, monkeypatch
+ ):
+-- 
+2.43.0
+
