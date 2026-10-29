@@ -19,7 +19,7 @@
     "frames": true
   },
   "limits": {
-    "cpu_millis": 2000,
+    "cpu_millis": 1000,
     "memory_mib": 2048,
     "request_bytes": 16777216,
     "response_bytes": 16777216,

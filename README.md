@@ -21,7 +21,7 @@ Penpot 2.18.5를 Coders Core의 독립 워크스페이스에서 실행하는 통
 
 1. 공개 GitHub 저장소와 공개 GHCR 패키지를 준비합니다. `.github/workflows/coders-build.yml`이 고정 커밋 이미지와 GitHub 빌드 증명을 게시합니다.
 2. 워크스페이스 비밀정보 `DESIGN_AUTH_SECRET`에 32자 이상의 충분히 긴 무작위 값을 등록합니다. 이 값은 Penpot의 마스터 키와 내부 계정 비밀번호 파생에 사용하므로 워크스페이스 수명 동안 유지해야 합니다. 값 변경에 대한 계정 마이그레이션은 아직 구현하지 않았습니다.
-3. `coders.json`의 자원 요청을 운영 한도와 비교합니다. 현재 2 vCPU, 2 GiB 메모리, 512 MiB 임시 공간, 요청·응답 각각 16 MiB, 이미지 상한 2 GiB입니다. 단일 이미지 기본 동작을 확인한 시작 설정이며, 동시 사용자 부하 검증은 남아 있습니다.
+3. `coders.json`의 자원 요청을 운영 한도와 비교합니다. 현재 1 vCPU, 2 GiB 메모리, 512 MiB 임시 공간, 요청·응답 각각 16 MiB, 이미지 상한 2 GiB입니다. 단일 이미지 기본 동작을 확인한 시작 설정이며, 동시 사용자 부하 검증은 남아 있습니다.
 4. 소유자가 최초 접속해 팀을 만듭니다. 이후 Core에서 초대한 멤버가 접속합니다.
 5. 검증한 앱 ID에 `design.coders.kr`을 등록합니다.
 
@@ -63,3 +63,5 @@ uv run python scripts/check_runtime.py
 공개 [GitHub 저장소](https://github.com/cykim8811/coders-design)와 GHCR 이미지 게시를 완료했습니다. 최초 게시 버전은 `a9d3a56dc1f90a957da9e3095d64c6abe668821b`, 이미지 digest는 `sha256:ba198463e17e5366281b1d7ab525f4600b00989088b84123ff8c2032fd9ea47b`입니다. 익명 이미지 접근과 빌드 출처 증명을 확인했으며 운영 Core의 준비 상태는 `ready`입니다. [Core 접속·워크스페이스 연결](https://core-v2.coders.kr/github/cykim8811/coders-design/a9d3a56dc1f90a957da9e3095d64c6abe668821b) 뒤 `DESIGN_AUTH_SECRET`을 설정해야 합니다. `design.coders.kr` 도메인 등록은 아직 수행하지 않았습니다.
 
 2026-10-29 재검증: Core `6ce5a0a`에서 생성한 CSP를 실제 Penpot 컨테이너에 적용한 두 사용자 브라우저 검사와 PNG/SVG 내보내기를 통과했습니다. 이 검사는 운영 Core의 인증·라우팅 경유 검증과 구분합니다.
+
+운영 노드는 CPU 1930m를 제공하므로 앱 2000m와 중계 컨테이너 200m를 함께 배치할 수 없었습니다. 실행 요청을 1000m로 조정했습니다. 초기 검증은 2 vCPU에서 수행했으며 1 vCPU 내보내기도 재검증했습니다.
