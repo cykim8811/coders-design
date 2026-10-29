@@ -36,7 +36,7 @@ async def main():
                     "Coders-Resource-Role": role,
                 },
             )
-            if os.environ.get("DESIGN_TEST_CSP"):
+            if os.environ.get("DESIGN_TEST_CSP") or os.environ.get("DESIGN_TEST_CSP_FILE"):
 
                 async def policy(route):
                     if route.request.resource_type == "document":
@@ -45,7 +45,11 @@ async def main():
                             response=response,
                             headers={
                                 **response.headers,
-                                "Content-Security-Policy": f"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self' {base}/chip/app; worker-src 'self' blob:; object-src 'none'",
+                                "Content-Security-Policy": (
+                                    Path(os.environ["DESIGN_TEST_CSP_FILE"]).read_text().strip()
+                                    if os.environ.get("DESIGN_TEST_CSP_FILE")
+                                    else f"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self' {base}/chip/app; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; worker-src 'self' blob:; object-src 'none'; manifest-src 'none'"
+                                ),
                             },
                         )
                     else:

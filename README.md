@@ -15,7 +15,7 @@ Penpot 2.18.5를 Coders Core의 독립 워크스페이스에서 실행하는 통
 
 ## 필요한 Core 버전
 
-일반 HTTP 앱 규약과 Versity Gateway 객체 저장소를 포함한 Core가 필요합니다. 추가로 `browser.frames: true` 지원이 필요합니다. Penpot의 `/rasterizer.html` 내부 iframe을 위해 CSP `frame-src`와 `frame-ancestors` 양쪽에 `'self'`를 허용하는 변경입니다. 해당 수정안은 Core의 `codex/design-frame-compat` 브랜치, 커밋 `0efeb43`에 있습니다. [적용 가능한 패치](integration/core-frames.patch)도 포함했습니다. 아직 이 옵션이 없는 Core에서는 manifest 검증이 거부됩니다.
+일반 HTTP 앱 규약과 Versity Gateway 객체 저장소를 포함한 Core가 필요합니다. 추가로 `browser.frames: true` 지원이 필요합니다. Penpot의 `/rasterizer.html` 내부 iframe을 위해 CSP `frame-src`와 `frame-ancestors` 양쪽에 `'self'`를 허용하는 변경입니다. Core 커밋 `6ce5a0a` (`codex/same-origin-frames`)에 이 규약과 같은 출처·외부 출처 iframe 격리 브라우저 검사가 반영되었습니다. 공개 개발 가이드에도 옵션이 명시돼 있습니다. 기존 [제안 패치](integration/core-frames.patch)는 이 변경의 기반으로 보관하며, 새 Core에 다시 적용할 필요가 없습니다. 아직 이 옵션이 없는 Core에서는 manifest 검증이 거부됩니다.
 
 ## 배포
 
@@ -52,7 +52,7 @@ uv run --with playwright python scripts/browser_smoke.py
 uv run python scripts/check_runtime.py
 ```
 
-`browser_smoke.py`는 두 사용자 창을 열어 소유자가 그린 도형이 멤버 화면에 추가되는지 검사합니다. `DESIGN_TEST_CSP=1`은 Core 정책과 내부 iframe 허용안을 적용한 브라우저 검사입니다. Playwright의 localhost 응답 가로채기에 따른 Local Network Access 오탐은 이 로컬 테스트에서만 해제합니다. `check_runtime.py`는 저장된 리비전, 이미지 원본 왕복, PNG·SVG 내보내기를 검사합니다.
+`browser_smoke.py`는 두 사용자 창을 열어 소유자가 그린 도형이 멤버 화면에 추가되는지 검사합니다. `DESIGN_TEST_CSP=1`은 Core 정책과 내부 iframe 허용안을 적용한 브라우저 검사입니다. Playwright의 localhost 응답 가로채기에 따른 Local Network Access 오탐은 이 로컬 테스트에서만 해제합니다. `DESIGN_TEST_CSP_FILE=artifacts/core-csp.txt`를 지정하면 Core의 `content_security_policy()`가 생성한 정책 파일을 그대로 적용합니다. `check_runtime.py`는 저장된 리비전, 이미지 원본 왕복, PNG·SVG 내보내기를 검사합니다.
 
 ## 현재 검증 범위와 남은 작업
 
@@ -61,3 +61,5 @@ uv run python scripts/check_runtime.py
 연결 서버 단위 테스트 5개와 Core 호환성 테스트 7개가 통과했습니다. 실제 Core를 거치는 300초 WebSocket 교체, 권한 철회, 잔액 부족 종료, 폰트 업로드, 백업·복원과 부하 검증은 남아 있습니다. 로컬 테스트 데이터는 별도 DB·파일 저장소 컨테이너의 임시 파일시스템에 있으며 해당 데이터 컨테이너를 중지하면 사라집니다.
 
 GitHub 게시와 실서비스 배포는 아직 수행하지 않았습니다.
+
+2026-10-29 재검증: Core `6ce5a0a`에서 생성한 CSP를 실제 Penpot 컨테이너에 적용한 두 사용자 브라우저 검사와 PNG/SVG 내보내기를 통과했습니다. 이 검사는 운영 Core의 인증·라우팅 경유 검증과 구분합니다.
