@@ -2,11 +2,62 @@
 
 import os
 import signal
+import socket
+import ssl
 import subprocess
 import sys
 import time
 import urllib.request
 from urllib.parse import unquote, urlsplit
+
+
+def redis_ready(uri):
+    """Check the actual data tunnel, without logging its URI or credentials."""
+    parsed = urlsplit(uri)
+    if parsed.scheme not in ("redis", "rediss") or not parsed.hostname:
+        raise RuntimeError("REDIS_URL must be a Redis connection URL")
+    commands = []
+    if parsed.password is not None:
+        credentials = [unquote(parsed.password)]
+        if parsed.username:
+            credentials.insert(0, unquote(parsed.username))
+        commands.append(["AUTH", *credentials])
+    database = parsed.path.lstrip("/") or "0"
+    if not database.isdecimal():
+        raise RuntimeError("REDIS_URL must specify a numeric database")
+    commands.extend([["SELECT", database], ["PING"]])
+    try:
+        with socket.create_connection((parsed.hostname, parsed.port or 6379), timeout=2) as raw:
+            connection = (
+                ssl.create_default_context().wrap_socket(raw, server_hostname=parsed.hostname)
+                if parsed.scheme == "rediss"
+                else raw
+            )
+            with connection, connection.makefile("rb") as reader:
+                for command in commands:
+                    parts = [part.encode() for part in command]
+                    payload = b"*" + str(len(parts)).encode() + b"\r\n"
+                    for part in parts:
+                        payload += b"$" + str(len(part)).encode() + b"\r\n" + part + b"\r\n"
+                    connection.sendall(payload)
+                    expected = b"+PONG\r\n" if command[0] == "PING" else b"+OK\r\n"
+                    if reader.readline(1024) != expected:
+                        return False
+        return True
+    except OSError:
+        return False
+
+
+def wait_for_redis(uri, deadline, stopping):
+    print("Waiting for the workspace Redis connection", flush=True)
+    while not stopping():
+        if time.monotonic() >= deadline:
+            raise RuntimeError("Workspace Redis connection did not become ready")
+        if redis_ready(uri):
+            print("Workspace Redis connection is ready", flush=True)
+            return True
+        time.sleep(0.5)
+    return False
 
 
 def environment():
@@ -70,8 +121,10 @@ def main():
 
     status = 0
     try:
-        backend = launch(["/bin/bash", "run.sh"], "/opt/penpot/backend")
         deadline = time.monotonic() + 160
+        if not wait_for_redis(env["REDIS_URL"], deadline, lambda: stopping):
+            return
+        backend = launch(["/bin/bash", "run.sh"], "/opt/penpot/backend")
         while not stopping:
             if backend.poll() is not None or time.monotonic() > deadline:
                 raise RuntimeError("Penpot backend did not become ready")
